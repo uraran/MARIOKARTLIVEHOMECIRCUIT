@@ -1601,6 +1601,72 @@ void phy_set_rf_path_switch_8188e(
 	}
 }
 
+u32 halrf_get_psd_dc_tone_8188e(
+	void *dm_void
+)
+{
+	struct dm_struct *dm = (struct dm_struct *)dm_void;
+	u32 i, j, tmp = 0, _reg_8b4_1, _reg_8b4_2, total = 0;
+
+	u32 _reg_88c = odm_get_bb_reg(dm, R_0x88c, 0xffffffff);
+	u32 _reg_800 = odm_get_bb_reg(dm, R_0x800, 0xffffffff);
+	u32 _reg_808 = odm_get_bb_reg(dm, R_0x808, 0xffffffff);
+
+	odm_set_bb_reg(dm, R_0x88c, 0x00300000, 0x3);
+	odm_set_bb_reg(dm, R_0x800, 0x01000000, 0x0);
+	odm_set_bb_reg(dm, R_0x808, 0x00000c00, 0x3);
+	odm_set_bb_reg(dm, R_0x808, 0x00003000, 0x3);
+	odm_set_bb_reg(dm, R_0x808, 0x0000c000, 0x3);
+
+	for (j = 0; j < 10; j++) {
+		odm_set_bb_reg(dm, R_0x808, 0x000003ff, 0x0);
+		odm_set_bb_reg(dm, R_0x808, 0x00400000, 0x0);
+		odm_set_bb_reg(dm, R_0x808, 0x00400000, 0x1);
+
+		for (i = 0; i < 10; i++)
+			ODM_delay_ms(1);
+
+		_reg_8b4_1 = odm_get_bb_reg(dm, R_0x8b4, 0x0000ffff);
+
+		odm_set_bb_reg(dm, R_0x808, 0x000003ff, 0x1);
+		odm_set_bb_reg(dm, R_0x808, 0x00400000, 0x0);
+		odm_set_bb_reg(dm, R_0x808, 0x00400000, 0x1);
+
+		for (i = 0; i < 10; i++)
+			ODM_delay_ms(1);
+
+		_reg_8b4_2 = odm_get_bb_reg(dm, R_0x8b4, 0x0000ffff);
+
+		if (_reg_8b4_1 > _reg_8b4_2)
+			tmp = _reg_8b4_1;
+		else
+			tmp = _reg_8b4_2;
+
+		odm_set_bb_reg(dm, R_0x808, 0x000003ff, 0x3ff);
+		odm_set_bb_reg(dm, R_0x808, 0x00400000, 0x0);
+		odm_set_bb_reg(dm, R_0x808, 0x00400000, 0x1);
+
+		for (i = 0; i < 10; i++)
+			ODM_delay_ms(1);
+
+		_reg_8b4_2 = odm_get_bb_reg(dm, R_0x8b4, 0x0000ffff);
+
+		if (_reg_8b4_2 > tmp)
+			tmp = _reg_8b4_2;
+
+		total = total + tmp;
+
+	}
+
+	tmp = total / 10;
+
+	odm_set_bb_reg(dm, R_0x808, 0xffffffff, _reg_808);
+	odm_set_bb_reg(dm, R_0x800, 0xffffffff, _reg_800);
+	odm_set_bb_reg(dm, R_0x88c, 0xffffffff, _reg_88c);
+
+	return tmp;
+}
+
 #if (DM_ODM_SUPPORT_TYPE == ODM_WIN)
 /* return value true => Main; false => Aux */
 boolean _phy_query_rf_path_switch_8188e(

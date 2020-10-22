@@ -793,6 +793,7 @@ void SetHalODMVar(
 			rtw_dump_raw_rssi_info(Adapter, sel);
 #endif
 		}
+		_RTW_PRINT_SEL(sel, "ED_TH_LB = %d\n", podmpriv->adaptivity.l2h_lb - podmpriv->dc_backoff);
 	}
 		break;
 	case HAL_ODM_RX_Dframe_INFO: {

@@ -1104,14 +1104,13 @@ int rtw_mp_pwrtrk(struct net_device *dev,
 	return 0;
 }
 
-
-
 int rtw_mp_psd(struct net_device *dev,
 	       struct iw_request_info *info,
 	       struct iw_point *wrqu, char *extra)
 {
 	PADAPTER padapter = rtw_netdev_priv(dev);
 	u8		input[wrqu->length + 1];
+	u32 val = 0;
 
 	_rtw_memset(input, 0, sizeof(input));
 	if (copy_from_user(input, wrqu->pointer, wrqu->length))
@@ -1119,8 +1118,15 @@ int rtw_mp_psd(struct net_device *dev,
 
 	input[wrqu->length] = '\0';
 	strcpy(extra, input);
+	RTW_INFO("extra = %s \n" , extra);
 
-	wrqu->length = mp_query_psd(padapter, extra);
+	if (strncmp(extra, "dc", 2) == 0) {
+		val = rtw_mp_get_psd_dc_tone(padapter);
+		_rtw_memset(extra, 0, sizeof(extra));
+		sprintf(extra, "dc=%u\n", val);
+		wrqu->length = strlen(extra);
+	} else
+		wrqu->length = mp_query_psd(padapter, extra);
 
 	return 0;
 }

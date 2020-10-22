@@ -1281,6 +1281,17 @@ void PhySetTxPowerLevel(PADAPTER pAdapter)
 		rtw_hal_set_tx_power_level(pAdapter, pmp_priv->channel);
 }
 
+u32  rtw_mp_get_psd_dc_tone(PADAPTER padapter)
+{
+#ifdef CONFIG_RTL8188E
+	RTW_INFO("%s() \n", __func__);
+	return rtw_hal_mp_get_psd_dc_tone(padapter);
+#else
+	RTW_INFO("%s() Not supported\n", __func__);
+	return 0;
+#endif
+}
+
 /* ------------------------------------------------------------------------------ */
 static void dump_mpframe(PADAPTER padapter, struct xmit_frame *pmpframe)
 {

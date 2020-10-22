@@ -176,6 +176,11 @@ int rtk_usb_phy_init(void)
 
 	if (initialized) goto out;
 
+	pr_err("[%s:%d] Disable port 0 phy reset at first!!!!\n",
+		    __func__, __LINE__);
+	writel( readl(IOMEM(0xfe000000)) & ~BIT(8), IOMEM(0xfe000000));
+	udelay(10);
+
 	/* Set page 0 */
 	//printk("[%s:%d], Set page 0\n", __FUNCTION__, __LINE__);
 	rtk_usb_phy_set_page(0);
@@ -251,6 +256,8 @@ int rtk_usb_phy_init(void)
 
 	initialized = 1;
 
+	writel( readl(IOMEM(0xfe000000)) | BIT(8), IOMEM(0xfe000000));
+	udelay(10);
 out:
 	spin_unlock_irqrestore(&rtk_phy_lock, flags);
 	return ret;

@@ -108,5 +108,8 @@ halrf_rf_lna_setting_8188e(
 	enum phydm_lna_set type
 );
 
+u32 halrf_get_psd_dc_tone_8188e(
+	void *dm_void
+);
 
 #endif	/*  #ifndef __HAL_PHY_RF_8188E_H__ */

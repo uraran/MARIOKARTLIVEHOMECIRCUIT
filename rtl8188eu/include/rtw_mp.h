@@ -733,6 +733,7 @@ u32	mp_query_psd(PADAPTER pAdapter, u8 *data);
 void	rtw_mp_trigger_iqk(PADAPTER padapter);
 void	rtw_mp_trigger_lck(PADAPTER padapter);
 u8 rtw_mp_mode_check(PADAPTER padapter);
+u32  rtw_mp_get_psd_dc_tone(PADAPTER padapter);
 
 
 void hal_mpt_SwitchRfSetting(PADAPTER pAdapter);
@@ -762,6 +763,8 @@ u8 mpt_to_mgnt_rate(u32	MptRateIdx);
 u8 rtw_mpRateParseFunc(PADAPTER pAdapter, u8 *targetStr);
 u32 mp_join(PADAPTER padapter, u8 mode);
 u32 hal_mpt_query_phytxok(PADAPTER	pAdapter);
+
+u32 rtw_hal_mp_get_psd_dc_tone(PADAPTER padapter);
 
 void
 PMAC_Get_Pkt_Param(
