@@ -101,5 +101,8 @@ int get_env_n(void *dev, unsigned char *buf);
 
 int save_env_n(void *dev, unsigned char *buf);
 void NF_dump_flash(n_device_type *device, unsigned int dst_addr, unsigned int src_page, unsigned int page_len);
+int calculate_maxinum_blk_number_of_remap();
+int nf_check_blank(n_device_type *device, UINT32 start_page, UINT32 size);
+int bbt_init_check(int index);
 
 #endif

@@ -102,7 +102,7 @@ static void nand_resume(struct mtd_info *mtd);
 static int nand_read_oob(struct mtd_info *mtd, loff_t from, struct mtd_oob_ops *ops);
 static int nand_write_oob(struct mtd_info *mtd, loff_t to, struct mtd_oob_ops *ops);
 static int nand_block_isbad(struct mtd_info *mtd, loff_t ofs);
-
+static int nand_ibb_check_after_erase(struct mtd_info *mtd, unsigned int page, unsigned char *buf_phy);
 int rtk_update_bbt(struct mtd_info *mtd, __u8 *data_buf, __u8 *oob_buf, BB_t *bbt);
 
 
@@ -379,6 +379,18 @@ static int rtk_backup_block(struct mtd_info *mtd, __u32 src_blk, __u32 remap_blk
 			NF_ERR_PRINT("[%s]error: erase page %u align failure\n",
 					 __func__, backup_start_page);
 		}
+		goto rtk_backup_block_end;
+	}
+
+	rc = nand_ibb_check_after_erase(mtd, backup_start_page, (unsigned char *)nrPhys_addr);
+	if (rc == 1) {
+		NF_ERR_PRINT("[%s]error: Find IBB  %u \n", __func__, backup_start_page / ppb);
+		rc = -1;
+		goto rtk_backup_block_end;
+	}
+	else if (rc == -ENOMEM) {
+		NF_ERR_PRINT("[%s]error: kmalloc fail at Block %u \n", __func__, backup_start_page / ppb);
+		rc = -2;
 		goto rtk_backup_block_end;
 	}
 
@@ -936,6 +948,48 @@ write_after_backup:
 	return 0;
 }
 
+/******************************* 
+returun
+0:  NOT FOUND IBB
+1:  FOUND IBB
+-ENOMEM:  ERORR NO MEMORY 
+********************************/
+static int nand_ibb_check_after_erase(struct mtd_info *mtd, unsigned int page, unsigned char *buf_phy)
+{
+	struct nand_chip *this = (struct nand_chip *)mtd->priv;
+	int rc = 0;
+	int i;
+	unsigned char *data = kmalloc(page_size, GFP_KERNEL); 
+	unsigned char *oob = kmalloc(oob_size, GFP_KERNEL); 
+
+	if (!data || !oob) {
+		rc = -ENOMEM;
+		goto nand_ibb_check_after_erase_end;
+	}
+
+	/* Only check IBB, so ignore other read error condition. */
+	/* check 1st and 2nd page */
+	for ( i = 0; i < 2; i++ ) {
+		if ( 0 == this->read_ecc_page(mtd, this->active_chip, page+i, data, oob, 
+					CP_NF_NONE, (dma_addr_t *)&buf_phy[0]) ) {
+			if(oob[0] != 0xFF) {
+				NF_ERR_PRINT("Find IBB :page:[%u], obb:[%02x]\n", page + i, oob[0]);
+				rc = 1;
+				goto nand_ibb_check_after_erase_end;
+			}
+		}
+	}
+
+nand_ibb_check_after_erase_end:
+	if (data)
+		kfree(data);
+
+	if (oob)
+		kfree(oob);
+
+	return rc;
+}
+
 static int nand_erase(struct mtd_info *mtd, struct erase_info *instr)
 {
 	return nand_erase_nand(mtd, instr, 0);
@@ -1005,6 +1059,20 @@ erase_after_bb_handle:
 			NF_ERR_PRINT("%s: block erase failed at page address=0x%08x not block alignment\n",
 					__func__, page);
 			goto err;
+		} else if (rc == 0) {
+			rc = nand_ibb_check_after_erase(mtd, page, (unsigned char *)nrPhys_addr);
+			if (rc == 1) {
+				NF_ERR_PRINT("[%s]error: Find IBB  %u \n", __func__, page / ppb);
+				/* Find IBB which is not in BBT, add it into BBT */
+				if (rtk_badblock_handle(mtd, page, block, 0, BACKUP_ERASE) == 0) {
+					goto erase_after_bb_handle;
+				}
+			}
+			else if (rc == -ENOMEM) {
+				NF_ERR_PRINT("[%s]error: kmalloc fail at Block %u \n", __func__, page / ppb);
+				rc = -2;
+				goto err;
+			}
 		}
 
 		if (chipnr != chipnr_remap)

@@ -31,10 +31,16 @@ start:
      str     sp, [r8]
 
 	 /* Enable i-cache and D-cache */
-	 mrc p15, 0, r0, c1, c0, 0
-	 orr r0, r0, #0x1000
-	 orr r0, r0, #0x4
-	 mcr p15, 0, r0, c1, c0, 0
+	 /* Because we enable the cache, we have to invalidate all first */
+	 mrc p15, 0, r1, c1, c0, 0
+	 orr r1, r1, #0x1000
+	 orr r1, r1, #0x4
+	 dsb
+
+	 mcr p15, 0, r0, c7, c6, 1
+	 mcr p15, 0, r0, c7, c5, 0
+	 mcr p15, 0, r1, c1, c0, 0
+	 isb
 
      ldr     sp, _stack_start
      bic     sp, sp, #7

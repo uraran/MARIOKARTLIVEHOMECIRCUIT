@@ -199,6 +199,20 @@ typedef struct {
 	unsigned int	data_partition_offset;
 	unsigned int	data_partition_length;
 	unsigned char	data_partition_sha_hash[32];
+	unsigned int	data_partition_remain_block_num;
+	unsigned int	profile_length;
+	unsigned char	profile_sha_hash[32];
+	unsigned int	kernel_1_end_block;
+	unsigned int	kernel_2_end_block;
+	unsigned int	rootfs_1_end_block;
+	unsigned int	rootfs_2_end_block;
+	unsigned int	dtb_1_end_block;
+	unsigned int	dtb_2_end_block;
+	unsigned int	afw_1_end_block;
+	unsigned int	afw_2_end_block;
+	unsigned int	tee_1_end_block;
+	unsigned int	tee_2_end_block;
+	unsigned char	desc_entry_verify_sha_hash[32];
 } __attribute__((packed)) bootcode_hwsetting_desc_entry_verify;
 
 // for fw_desc_table_v1_t.version = FW_DESC_TABLE_V1_T_VERSION_11
