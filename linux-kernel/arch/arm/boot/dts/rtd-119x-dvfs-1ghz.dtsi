@@ -1,0 +1,45 @@
+/*
+* DVFS table: SCPU frequncy more than 1Ghz
+*/
+
+/ {
+ dvfs: dvfs {
+        voltage-step-ctl = <0>;
+        frequency-table = <
+            0   290000
+            0   300000
+            0   390000
+            0   400000
+            1   500000
+            1   600000
+            1   720000
+            1   800000
+            2   900000
+            2   945500
+            2  1000000
+            2  1100000
+            //3  1200000
+            >; // index frequency(kHz)
+	voltage-table = <
+            0    925000  925000
+            1   1075000 1075000
+            2   1225000 1250000
+            3   1250000 1275000
+            >; // index VoltageMin VoltageMax (nV)
+    };
+    mfd_rtp5901: mfd_rtp5901 {
+	   regulator-table = <
+                0 0 0               // LDO1
+                0 0 0               // LDO2
+                0 0 0               // LDO3
+                0 0 0               // LDO4
+                0 0 0               // LDO5
+                1 1100000 2200000   // BUCK1, for core power 
+                1  700000 1400000   // BUCK2, for SCPU DVFS  
+                0 0 0               // BUCK3
+                0 0 0               // BUCK4
+                 >; // enable minVoltage_uV maxVlotage_uV
+
+           status = "okay";
+    };
+};

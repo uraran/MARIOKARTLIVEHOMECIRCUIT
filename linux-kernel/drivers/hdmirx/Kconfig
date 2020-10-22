@@ -1,0 +1,14 @@
+config HDMI_RX
+	tristate "hdmi rx"
+	select MEDIA_SUPPORT
+	select MEDIA_CAMERA_SUPPORT
+	select VIDEO_DEV
+	select I2C
+	select VIDEO_V4L2
+	select VIDEOBUF2_CORE
+	select VIDEOBUF_GEN
+	select VIDEOBUF2_VMALLOC
+	select VIDEOBUF2_DMA_CONTIG
+	default N
+	help
+	  Add Hdmi RX driver.

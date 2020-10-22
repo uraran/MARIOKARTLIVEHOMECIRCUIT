@@ -1,0 +1,212 @@
+comment "Realtek Platform Type"
+choice
+	prompt "Realtek Platform Type"
+	depends on ARCH_RTK119X
+	default MACH_RTK1195
+
+config MACH_RTK1192
+	bool "1192 EVB board"
+	select PCI
+	select ARCH_SUPPORTS_MSI
+	select ARM_GIC if ARCH_RTK119X
+	help
+	  Support for Realtek 1192 EVB board
+
+config MACH_RTK1195
+	bool "1195 board"
+	select ARM_GIC if ARCH_RTK119X
+	select ARCH_HAS_BARRIERS
+	help
+	  Support for Realtek 1195 board
+endchoice
+
+menu "Realtek Platform Driver"
+
+config REALTEK_PCIE
+	depends on PCI
+	bool "PCI-E host controller driver"
+	help
+	  Realtek PCI-E host controller driver
+
+config RTK_MCP
+	bool "MCP driver"
+	help
+	  Content Protection driver
+
+config RTK_TIMER
+	bool "Timer driver"
+	default y
+	help
+	  Realtek Timer driver
+
+config RTK_WATCHDOG
+	bool "Watchdog driver"
+	default n
+	help
+	  Realtek Watchdog driver
+
+config RTK_WATCHDOG_ENABLE_TIMER
+	bool "Enable watchdog hw reset timer"
+	depends on RTK_WATCHDOG
+	default n
+	help
+	  Enable watchdog hw reset timer
+
+config UIO_RTK_RBUS
+	bool "Memory mapping RBUS area to userspace"
+	default n
+    select UIO
+    select UIO_ASSIGN_MINOR
+	help
+	  Memory mapping RBUS area to userspace
+
+config UIO_RTK_REFCLK
+	bool "Memory mapping Reference Clock area to userspace"
+	default n
+    select UIO
+    select UIO_ASSIGN_MINOR
+	help
+	  Memory mapping Reference Clock area to userspace
+
+config RTK_SE
+	bool "Streaming Engine driver"
+	default n
+	help
+	  Realtek Streaming Engine driver
+
+config RTK_VFD
+	bool "VFD driver"
+	default n
+	help
+	  Realtek VFD driver
+
+config UIO_RTK_SE
+	bool "Streaming Engine driver use UIO mode"
+	default n
+    select UIO
+    select UIO_ASSIGN_MINOR
+	select CONFIG_UIO_PDRV_GENIRQ
+	select CONFIG_UIO_DMEM_GENIRQ
+	help
+	  Realtek Streaming Engine driver use UIO mode
+	  
+config UIO_RTK_MD
+	bool "Moving Data Engine driver use UIO mode"
+	default n
+    select UIO
+    select UIO_ASSIGN_MINOR
+	select CONFIG_UIO_PDRV_GENIRQ
+	select CONFIG_UIO_DMEM_GENIRQ
+	help
+	  Realtek Moving Data Engine driver use UIO mode
+
+config RTK_MD
+	bool "Moving Data Engine(DMA) driver"
+	default n
+	help
+	  Realtek Moving Data Engine(DMA) driver
+
+config RTK_KMD
+	bool "KMD(DMA) driver"
+	default n
+	help
+	  KMD driver for kernel API
+
+config RTK_RTC
+	bool "RTC driver"
+	default n
+	help
+	  Realtek RTC driver
+
+config RTK_FB
+	bool "Frame Buffer driver"
+	select SYNC
+	select SW_SYNC
+	select SW_SYNC_USER
+	default y
+	help
+	  Realtek Frame Buffer driver
+
+config RTK_RPC
+	bool "RPC driver"
+	default n
+	help
+	  Realtek RPC driver with audio CPU
+
+config REALTEK_AVCPU
+        bool "AVCPU driver"
+        default n
+        help
+          Realtek avcpu driver
+
+config RTK_BT_RESET
+        bool "Bluetooth RFKILL driver"
+        default n
+        help
+          Realtek Bluetooth rfkill driver
+
+config RTK_SB2_MEM_TRASH_MONITOR
+        bool "Memory trash monitor"
+        default n
+        help
+          Enable helper functions for memory trash detection. If unsure, say N.
+
+config RTK_MON_GPIO
+	bool "Monitor GPIO input"
+	default n
+	help
+	  Enable to monitor input GPIO.
+
+config USB_XHCI_HCD_TEST_MODE
+	bool "XHCI test mode"
+	default n
+	help
+	  Enable XHCI testing mode.
+
+config USB_ERRATA_43575
+	bool "XHCI+RTS5401 with USB2.0 device can't identify"
+	default y
+	help
+	  USB3 MAC at U2 mode, DPHY handshake fail while suspend & resume ops
+
+config USB_ERRATA_43576
+	bool "XHCI+RTS5401, USB3.0 device can't identify with short line"
+	default y
+	help
+	  EQ value need to trim at different line
+
+config RTK_V1_ST
+	bool "Debug V1 status"
+	default y
+	help
+	  Display V1 status via a device node
+
+source "arch/arm/mach-rtk119x/driver/Kconfig"
+source "arch/arm/mach-rtk119x/driver/rtk_ve/Kconfig"
+
+endmenu
+
+menu "Realtek NAS support"
+	depends on ARCH_RTK119X
+
+config SENDFILE_PATCH
+	bool "Reverse sendfile patch"
+	default n
+	help
+	Use patched sendfile syscall to improve write performance on NAS.
+
+config ENABLE_FAT_FALLOCATE
+	bool "Enable fallocate on FAT"
+	default n
+	help
+	Improve write performance on FAT partitions.
+
+config MTD_NAND_DISC
+	bool "Enable MTD disc for NAND"
+	default n
+	help
+	Add last mtd partition(disc) to access whole MTD NAND flash.
+        This special partition keeps the numeric suffix in dev name for
+        mtd-util compatibility.
+
+endmenu

@@ -1,0 +1,54 @@
+menu "Uncatalogued drivers"
+	depends on ARCH_RTK119X
+
+
+config REALTEK_IR
+        tristate "IR Receiver Driver"
+        depends on ARCH_RTK119X
+        default y
+        help
+          IR Receiver Character Device Driver
+
+
+ 
+if REALTEK_IR
+
+config SUPPORT_INPUT_DEVICE
+	bool "Support IR Input Device"
+	depends on REALTEK_IR
+	help
+	  IR Input Device Support
+
+config SUPPORT_IRTX
+	bool "Support IR TX"
+	depends on REALTEK_IR
+	help
+	  IR TX Support
+
+
+config YK_54LU
+	bool "Support Skyworth TV Remote Controller"
+	depends on REALTEK_IR
+	default n
+	help
+	  Skyworth TV Remote Controller
+
+config RTK_MK5_2
+	bool "Support Realtek DTV Controller"
+	depends on REALTEK_IR
+	default n
+	help
+	  Realtek DTV Remote Controller
+
+endif
+
+
+config REALTEK_GPIO
+        tristate "GPIO Driver"
+        depends on ARCH_RTK119X
+	select ARCH_REQUIRE_GPIOLIB
+        default n
+        help
+          GPIO Device Driver
+endmenu
+

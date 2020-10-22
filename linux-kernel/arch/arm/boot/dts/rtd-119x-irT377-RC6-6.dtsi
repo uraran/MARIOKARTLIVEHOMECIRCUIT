@@ -1,0 +1,34 @@
+/*
+ * rtd-119x-irT377-RC6-6.dtsi - IRDA remote Device Tree Include file for REALTEK 119X family SoC
+ */
+
+/include/ "skeleton.dtsi"
+
+/ {
+	irda@18007400 {
+		Realtek,irrx-protocol = <12>;	//NEC = 1, RC5 = 2, SHARP = 3, SONY = 4, C03 = 5, RC6 = 6, RAW_NEC = 7, RCA = 8, PANASONIC = 9, KONKA=10, RAW_RC6 = 11, RC6_Mode_6 = 12
+		Realtek,irtx-protocol = <1>;	//NEC_TX = 1, RC5_TX = 2, SHARP_TX = 3, SONY_TX = 4,	C03_TX = 5, RC6_TX = 6, RCA_TX = 7, PANASONIC_TX = 8, KONKA_TX=9, 
+
+		Realtek,cust-code = <0x800F>; // RC6_MODE_6 (Philip)
+		Realtek,scancode-msk = <0x000000FF>;
+		Realtek,custcode-msk = <0xFFFF0000>;
+		Realtek,keymap-tbl = <
+			0x0F   358  //KEY_INFO
+			0x0C   116  //KEY_POWER
+			0x20   105  //KEY_LEFT
+			0x22   352  //KEY_SELECT = OK
+			0x21   106  //KEY_RIGHT	
+			0x1E   103  //KEY_UP
+			0x1F   108  //KEY_DOWN
+			0x23   158  //KEY_BACK	
+			0x5B   102  //KEY_HOME
+			0x26   357  //KEY_OPTION
+			0x11   114  //KEY_VOLUMEDOWN
+			0x10   115  //KEY_VOLUMEUP
+			0x0E   113  //KEY_MUTE
+		>;
+
+		Realtek,reg-ir-dpir = <100>;	/*IR detect interval, Philip = 100ms, between:9ms-100ms */
+	};
+};
+

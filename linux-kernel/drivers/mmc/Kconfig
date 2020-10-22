@@ -1,0 +1,52 @@
+#
+# MMC subsystem configuration
+#
+
+menuconfig MMC
+	tristate "MMC/SD/SDIO card support"
+	depends on HAS_IOMEM
+	help
+	  This selects MultiMediaCard, Secure Digital and Secure
+	  Digital I/O support.
+
+	  If you want MMC/SD/SDIO support, you should say Y here and
+	  also to your specific host controller driver.
+
+config MMC_DEBUG
+	bool "MMC debugging"
+	depends on MMC != n
+	help
+	  This is an option for use by developers; most people should
+	  say N here.  This enables MMC core and driver debugging.
+
+config MMC_RTKEMMC
+	bool "MMC RTK emmc"
+	help
+	  Support RealTek EMMC for Phoenix.
+
+config MMC_FOR_RTK_FPGA
+	bool "MMC RTK EMMC/SD/SDIO runs on FPGA b/d"
+	help
+	  Support RealTek EMMC/SD/SDIO for Phoenix FPGA b/d.
+
+menuconfig MMC_RTKSD
+	tristate "MMC RTK SD"
+	help
+	  Support RealTek SD for Phoenix.
+	  
+config MMC_RTKSD_INTERRUPT
+	bool "Interrupt Mode"
+	default y
+	depends on MMC_RTKSD
+	help
+	  RTK SD Card Reader Interrupt Mode
+
+if MMC
+
+source "drivers/mmc/core/Kconfig"
+
+source "drivers/mmc/card/Kconfig"
+
+source "drivers/mmc/host/Kconfig"
+
+endif # MMC

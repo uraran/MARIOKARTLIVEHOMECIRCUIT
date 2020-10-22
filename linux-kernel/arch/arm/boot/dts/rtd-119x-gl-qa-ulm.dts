@@ -1,0 +1,137 @@
+/*
+ *
+ */
+
+/dts-v1/;
+
+#include "../../mach-rtk119x/include/mach/memory.h"
+
+/memreserve/ SYS_BOOTCODE_MEMBASE	SYS_BOOTCODE_MEMSIZE;				/* ROM code */
+/memreserve/ PLAT_AUDIO_BASE_PHYS 	PLAT_AUDIO_SIZE;					/* Audio Firmware */
+/memreserve/ RPC_RINGBUF_PHYS 		RPC_RINGBUF_SIZE;					/* RPC ring buffer */
+/memreserve/ ION_AUDIO_HEAP_PHYS    ION_AUDIO_HEAP_SIZE;
+/memreserve/ ULM_ION_MEDIA_HEAP_PHYS1   ULM_ION_MEDIA_HEAP_SIZE1;
+
+/include/ "rtd-119x-gl-qa-ulm.dtsi"
+
+
+/ {
+	model= "Realtek_CA7_CA7";
+	compatible = "Realtek,FPGA_v6", "Realtek,rtd-119x";
+
+	aliases {
+		serial0 = &uart0;
+	};
+
+	chosen {
+		bootargs = "earlyprintk console=ttyS0,115200 ";
+	};
+
+	memory {
+		device_type = "memory";
+		reg =  <0x00000000 0x10000000>;					/* 256 MB */
+	};
+
+
+	soc {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		reg = <0x18000000 0x70000>;
+		compatible = "simple-bus";
+		device_type = "soc";
+		ranges;
+
+	};
+	rtk,ion {
+		compatible = "Realtek,rtk-ion";
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		rtk,ion-heap@0 {	/* SYSTEM_HEAP */
+			compatible = "Realtek,rtk-ion-reserve";
+			reg = <0>;
+			rtk,memory-reservation-size = <0x0>;
+		};
+		rtk,ion-heap@1 {	/* System contig */
+			compatible = "Realtek,rtk-ion-reserve";
+			reg = <1>;
+			rtk,memory-reservation-size = <0x0>;
+		};
+		rtk,ion-heap@4 {	/* DMA_HEAP */
+			compatible = "Realtek,rtk-ion-reserve";
+			reg = <4>;
+			rtk,memory-reservation-size = <0x0>;
+		};
+		rtk,ion-heap@8 {	/* Audio */
+			compatible = "Realtek,rtk-ion-reserve";
+			reg = <8>;
+            rtk,memory-reserve = <
+                ION_AUDIO_HEAP_PHYS ION_AUDIO_HEAP_SIZE ION_AUDIO_HEAP_FLAG
+                >;
+		};
+		rtk,ion-heap@7 {	/* TYPE_MEDIA */
+			compatible = "Realtek,rtk-ion-reserve";
+			reg = <7>;
+            rtk,memory-reserve = <
+				ULM_ION_MEDIA_HEAP_PHYS1 ULM_ION_MEDIA_HEAP_SIZE1 ULM_ION_MEDIA_HEAP_FLAG1
+                >;
+		};
+	};
+	fb {
+		compatible = "Realtek,rtk-fb";
+		buffer-cnt = <3>;
+		resolution = <1280 720>;
+		fps = <60>;
+	};
+	timer0@1801b000 {
+		clock-frequency = <27000000>;
+	};
+	timer1@1801b000 {
+		clock-frequency = <27000000>;
+	};
+	uart0: serial0@18007800 {
+		clock-frequency = <27000000>;
+	};
+	uart1: serial1@1801B200 {
+		clock-frequency = <432000000>;
+	};
+
+	rtk_misc_gpio: rtk_misc_gpio@1801b100 {
+		gpios = 
+		<&rtk_misc_gpio 4 0 0>, 				/*install button, input, default N/A */
+	//	<&rtk_misc_gpio 5 1 1>, 				/*usb3 power , output, default high */
+		<&rtk_misc_gpio 8 1 1>; 				/*audio dac unmute , output, default high */
+	};		
+
+	rtk_iso_gpio: rtk_iso_gpio@18007100 {
+		gpios = <&rtk_iso_gpio 4 1 1>;				/*wifi power , output, default high */
+	};	
+    nic: gmac@18016000 {
+        rtl-features = <2>;
+//      mac-address = [00 10 20 30 40 50];
+        status = "okay";
+    };
+	usb_ss: rtk_dwc3@18013200 {
+		realtek,rst-gpio = <&rtk_misc_gpio 5 1 0>;		/*usb3 power , output, default low */
+		dwc3@18020000 {
+			dr_mode = "host";
+		};
+	};
+	crsd@18010400 {
+		gpios = <&rtk_misc_gpio 23 1 1>; 		/*sd power , output, default high  (poweroff) */
+	};
+	sb2@1801a000 {
+		status = "okay";
+	};
+	scpu_wrapper@1801d000 {
+		compatible = "Realtek,rtk-scpu_wrapper";
+		reg = <0x1801d000 0x500>;
+		interrupts = <0 46 4>;
+	};
+	rtc {
+
+		compatible = "Realtek,rtk119x-rtc";
+		reg = <0x1801b600 0x34>, <0x18007000 0xdc>;
+		rtc-base-year = <2014>;
+	};
+};

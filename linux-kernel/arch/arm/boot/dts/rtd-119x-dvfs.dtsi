@@ -1,0 +1,56 @@
+/*
+* Default DVFS table: SCPU frequency no more than 1Ghz and use other to control voltage.
+*/
+
+
+/ {
+    dvfs: dvfs {
+        compatible = "Realtek,rtk119x-dvfs";
+        transition_latency = <500000>; // nanoseconds
+        rm-threshold-uV = <950000>;
+        voltage-step-ctl = <1>;
+        gpios = <&rtk_iso_gpio 15 1 1>, <&rtk_iso_gpio 16 1 1>;
+        frequency-table = <
+            //0   290000
+            //0   300000
+            //0   390000
+            //0   400000
+            //1   500000
+            //1   600000
+            //1   720000
+            //2   800000
+            //2   900000
+            //2   945500
+            2  1000000
+            //2  1100000
+            //3  1200000
+            >; // index frequency(kHz)
+        voltage-table = <
+              0   1000000 1000000
+              1   1100000 1100000
+              2   1200000 1200000
+              //3   1250000 1300000
+            >; // index VoltageMin VoltageMax (nV)
+         status = "okay";
+    };
+
+    mfd_rtp5901: mfd_rtp5901 {
+	compatible = "Realtek,rtk119x-rtp5901";
+	gpios = <&rtk_iso_gpio 14 0 0>;
+	interrupt-parent = <&rtk_iso_gpio>;
+	interrupts = <14>;
+	gpio_base = <81>; // gpio_base 60 + 21 = 81
+	regulator-table = <
+		0 0 0               // LDO1
+		0 0 0               // LDO2
+		0 0 0               // LDO3
+		0 0 0               // LDO4
+		0 0 0               // LDO5
+		0 0 0               // BUCK1
+		1 700000 1300000    // BUCK2
+		0 0 0               // BUCK3
+		0 0 0               // BUCK4
+		 >; // enable minVoltage_uV maxVlotage_uV
+	status = "disabled";
+    };
+};

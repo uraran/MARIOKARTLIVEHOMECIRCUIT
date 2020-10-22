@@ -1,0 +1,10 @@
+#ifndef _REG_MCP_H_INCLUDED_
+#define _REG_MCP_H_INCLUDED_
+
+#define MCP_OFFSET				0x00015000
+
+#define RBUS_MCP_PHYS(pa)		(RBUS_BASE_PHYS + MCP_OFFSET + pa)
+
+#define MCP_IO_ADDR(pa)			(IOMEM(RBUS_BASE_VIRT) + MCP_OFFSET + pa)
+
+#endif	// _REG_MCP_H_INCLUDED_

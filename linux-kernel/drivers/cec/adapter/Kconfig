@@ -1,0 +1,14 @@
+#Copyright (C) 2007-2013 Realtek Semiconductor Corporation.
+# drivers/Kconfig
+
+menu "CEC0 Adapters"	
+	depends on CEC
+
+config RTD1195_CECTX
+	tristate "CEC Controller 0 for Realtek RTD1195 platform"
+	depends on CEC 
+	default y
+	help
+	  Say Y, if you want to enable CEC0 feature on Realtek RTD1195 platform.
+
+endmenu

@@ -1,0 +1,10 @@
+#Copyright (C) 2007-2014 Realtek Semiconductor Corporation.
+# drivers/Kconfig
+
+config RTK_HDCP_1x
+	tristate "HDCP 1.x for Realtek RTD1195 platform"
+	select I2C
+	select SWITCH
+	default n
+	help
+	  Say Y, if you want to enable HDCP 1.x feature on Realtek RTD1195 platform.

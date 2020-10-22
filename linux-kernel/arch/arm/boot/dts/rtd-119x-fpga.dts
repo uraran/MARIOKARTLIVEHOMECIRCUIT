@@ -1,0 +1,67 @@
+/*
+ *
+ */
+
+/dts-v1/;
+
+/memreserve/ 0x00000000 0x00100000;
+/memreserve/ 0x10000000 0x00100000;
+/memreserve/ 0x05000000 0x08000000;
+
+
+/include/ "rtd-119x.dtsi"
+
+
+/ {
+	model= "Realtek_CA7_CA7";
+	compatible = "Realtek,FPGA_v6", "Realtek,rtd-119x";
+
+	aliases {
+		serial0 = &uart0;
+	};
+
+	chosen {
+		bootargs = "earlyprintk console=ttyS0,115200 cma=16m@64m";
+	};
+
+	memory {
+		device_type = "memory";
+		reg = <0 0x10000000>;	/* 128 MB */
+	};
+
+
+	soc {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		reg = <0x18000000 0x70000>;
+		compatible = "simple-bus";
+		device_type = "soc";
+		ranges;
+
+	};
+	rtk,ion {
+		compatible = "Realtek,rtk-ion";
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		rtk,ion-heap@30 {	/* SYSTEM_HEAP */
+			compatible = "Realtek,rtk-ion-reserve";
+			reg = <30>;
+			rtk,memory-reservation-size = <0x8000>;
+		};
+		rtk,ion-heap@29 {	/* MM_HEAP */
+			compatible = "Realtek,rtk-ion-reserve";
+			reg = <29>;
+			rtk,memory-reservation-size = <0x800000>;
+		};
+	};
+	timer0@1801b000 {
+		clock-frequency = <33000000>;
+	};
+	timer1@1801b000 {
+		clock-frequency = <33000000>;
+	};
+	uart0: serial0@18007800 {
+		clock-frequency = <33000000>;
+	};
+};

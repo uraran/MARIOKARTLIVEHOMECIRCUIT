@@ -1,0 +1,1 @@
+zreladdr-$(CONFIG_ARCH_RTK119X)	+= 0x00108000

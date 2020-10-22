@@ -1,0 +1,17 @@
+menuconfig LSADC
+	bool "LSADC Support"
+	help
+	  Low speed ADC support.
+
+	  If unsure, say no.
+
+if LSADC
+
+config RTK_LSADC
+	tristate "Realtek RTD1195 LSADC support"
+	depends on ARCH_RTK119X
+	default y
+	help
+	  Say Y, if you want to enable LSADC feature on Realtek RTD1195 platform.
+	  
+endif
