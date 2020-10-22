@@ -151,18 +151,32 @@ void rtw_hal_lck_test(_adapter *adapter)
 void rtw_hal_k(_adapter *adapter, u8 trigger_type)
 {
 	struct dm_struct *p_dm_odm = adapter_to_phydm(adapter);
-	u8 thermal_value = p_dm_odm->rf_calibrate_info.avg_thermal_value;
+	u8 thermal_value;
 
 	if (trigger_type != 1 && trigger_type != 2 && trigger_type != 3) {
 		RTW_INFO("Unsupported trigger_type: %u\n", trigger_type);
 		return;
 	}
 
+	enter_critical_bh(&adapter->k_lock);
+	if (adapter->k_run == 1) {
+		exit_critical_bh(&adapter->k_lock);
+		return;
+	}
+	adapter->k_run = 1;
+	exit_critical_bh(&adapter->k_lock);
+
+	thermal_value = p_dm_odm->rf_calibrate_info.avg_thermal_value;
+
 	rtw_ps_deny(adapter, PS_DENY_IOCTL);
 	LeaveAllPowerSaveModeDirect(adapter);
 
 	rtw_phydm_ability_backup(adapter);
-	rtw_phydm_func_disable_all(adapter);
+	if (rtw_odm_adaptivity_needed(adapter) == _TRUE) {
+		rtw_phydm_ability_ops(adapter, HAL_PHYDM_ABILITY_SET, ODM_BB_DIG | ODM_BB_RSSI_MONITOR | ODM_BB_ADAPTIVITY);
+		rtw_phydm_ability_ops(adapter, HAL_PHYDM_DIS_HALRF, 0);
+	} else
+		rtw_phydm_func_disable_all(adapter);
 
 	if (trigger_type == 1) {
 		RTW_INFO("[%s] IQK\n", __FUNCTION__);
@@ -187,6 +201,8 @@ void rtw_hal_k(_adapter *adapter, u8 trigger_type)
 
 	rtw_phydm_ability_restore(adapter);
 	rtw_ps_deny_cancel(adapter, PS_DENY_IOCTL);
+
+	adapter->k_run = 0;
 }
 
 #ifdef CONFIG_FW_OFFLOAD_PARAM_INIT
@@ -793,7 +809,8 @@ void SetHalODMVar(
 			rtw_dump_raw_rssi_info(Adapter, sel);
 #endif
 		}
-		_RTW_PRINT_SEL(sel, "ED_TH_LB = %d\n", podmpriv->adaptivity.l2h_lb - podmpriv->dc_backoff);
+		_RTW_PRINT_SEL(sel, "ED_TH = %d\n", podmpriv->adaptivity.th_l2h + 13);
+		_RTW_PRINT_SEL(sel, "ED_TH_LB_auto = %d, ED_TH_LB_manual = %d\n", podmpriv->adaptivity.l2h_lb - podmpriv->dc_backoff + 13, podmpriv->adaptivity.l2h_manual);
 	}
 		break;
 	case HAL_ODM_RX_Dframe_INFO: {

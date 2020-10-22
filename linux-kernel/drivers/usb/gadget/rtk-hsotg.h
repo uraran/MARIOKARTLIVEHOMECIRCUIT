@@ -241,6 +241,7 @@
 #define DOEPMSK				HSOTG_REG(0x814)
 
 #define DOEPMSK_Back2BackSetup			(1 << 6)
+#define DOEPMSK_StsPhseRcvdMsk			(1 << 5)
 #define DOEPMSK_OUTTknEPdisMsk			(1 << 4)
 #define DOEPMSK_SetupMsk			(1 << 3)
 #define DOEPMSK_AHBErrMsk			(1 << 2)
@@ -318,8 +319,10 @@
 #define DIEPINT(_a)			HSOTG_REG(0x908 + ((_a) * 0x20))
 #define DOEPINT(_a)			HSOTG_REG(0xB08 + ((_a) * 0x20))
 
+#define DxEPINT_StupPktRcvd			(1 <<15)
 #define DxEPINT_INEPNakEff			(1 << 6)
 #define DxEPINT_Back2BackSetup			(1 << 6)
+#define DxEPINT_StsPhseRcvd			(1 << 5)
 #define DxEPINT_INTknEPMis			(1 << 5)
 #define DxEPINT_INTknTXFEmp			(1 << 4)
 #define DxEPINT_OUTTknEPdis			(1 << 4)

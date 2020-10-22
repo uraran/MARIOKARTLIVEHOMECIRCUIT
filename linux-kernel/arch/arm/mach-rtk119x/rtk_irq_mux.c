@@ -101,7 +101,6 @@ static void mux_irq_handle(unsigned int irq, struct irq_desc *desc)
 	//struct irq_mux_data *mux_data = irq_desc_get_handler_data(desc);
 	struct irq_mux_data *mux_data = irq_get_handler_data(irq);
 	struct irq_chip *chip = irq_get_chip(irq);
-	static u32 count=0;
     int ret;
 	unsigned int mux_irq;
 	unsigned long status, check_status;
@@ -150,19 +149,10 @@ static void mux_irq_handle(unsigned int irq, struct irq_desc *desc)
     spin_unlock(&irq_mux_lock);
 
     if (check_status == status) {
-		if(count>1)
-			printk(KERN_ERR "[%s] irq(%u) status is not change. clear it! (st:0x%08lx en:0x%08lx), count(%u)\n", __func__, irq, status, enable, count);
-		else
-			count++;
-
         spin_lock(&irq_mux_lock);
         rtd_setbits(mux_data->base+reg_st, BIT(__ffs(status)));
         spin_unlock(&irq_mux_lock);
     }
-	else
-	{
-		count = 0;
-	}
 out:
 	chained_irq_exit(chip, desc);
 }

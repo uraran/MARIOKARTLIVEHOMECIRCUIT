@@ -777,6 +777,8 @@ i2c_0: i2c@0x18007D00 {
 	};
 	spi_0: spi@1801bd00 {
 		compatible = "Realtek,rtk119x-spi";
+		interrupt-parent = <&mux_intc>;
+		interrupts = <0 27>;
 		reg = <0x1801bd00 40>;
 		pinctrl-names = "default";
 		pinctrl-0 = <&gspi_pins>;

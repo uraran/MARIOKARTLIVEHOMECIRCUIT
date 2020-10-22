@@ -49,14 +49,17 @@ phydm_dig_up_bound_lmt_en(
 		(!dm->adaptivity_enable)
 	) {
 		adaptivity->igi_up_bound_lmt_cnt = 0;
-		adaptivity->igi_lmt_en = false;	
+		/* Always enable IGI limit because of always enabling Application mode */
+		adaptivity->igi_lmt_en = true;
 		return;
 	}
 
-	if (dm->total_tp > 1) {
+	/* if (dm->total_tp > 1) { */
+	/* Always go into Application mode */
+	if (1) {
 		adaptivity->igi_lmt_en = true;			
 		adaptivity->igi_up_bound_lmt_cnt = adaptivity->igi_up_bound_lmt_val;
-		PHYDM_DBG(dm, DBG_ADPTVTY, "TP >1, Start limit IGI upper bound\n");
+		PHYDM_DBG(dm, DBG_ADPTVTY, "Application mode. Start limit IGI upper bound\n");
 	} else {
 		if (adaptivity->igi_up_bound_lmt_cnt == 0)
 			adaptivity->igi_lmt_en = false;
@@ -383,7 +386,7 @@ phydm_search_pwdb_lower_bound(
 				tx_edcca1 = tx_edcca1 + 1;
 		}
 
-		if (tx_edcca1 > 1) {
+		if (tx_edcca1 >= 1) {
 			IGI = IGI - 1;
 			th_l2h_dmc = th_l2h_dmc + 1;
 			if (th_l2h_dmc > 10)
@@ -586,7 +589,8 @@ phydm_adaptivity_init(
 	adaptivity->igi_up_bound_lmt_val = 90;
 #endif
 	adaptivity->igi_up_bound_lmt_cnt = 0;
-	adaptivity->igi_lmt_en = false;
+	/* Enable IGI limit in the initiation process because of always enabling Application mode */
+	adaptivity->igi_lmt_en = true;
 
 }
 
@@ -873,6 +877,95 @@ phydm_set_edcca_threshold_api(
 }
 
 void
+phydm_search_pwdb_lb_manual(
+	void		*dm_void
+)
+{
+	struct dm_struct *dm = (struct dm_struct *)dm_void;
+	struct phydm_adaptivity_struct	*adaptivity = (struct phydm_adaptivity_struct *)phydm_get_structure(dm, PHYDM_ADAPTIVITY);
+	u8 igi_bkp = (u8)odm_get_bb_reg(dm, 0xc50, 0x7f);
+	u32 reg_c4c_bkp = odm_get_bb_reg(dm, 0xc4c, MASKDWORD);
+	u32			value32 = 0, reg_value32 = 0;
+	u8			cnt, try_count = 0;
+	u8			tx_edcca1 = 0;
+	boolean			is_adjust = true;
+	s8			th_l2h_dmc;
+	s8			diff;
+
+	/*stop dynamic mechanism*/
+	dm->disable_phydm_watchdog = 1;
+	dm->edcca_enable = false;
+
+	/*fix gain*/
+	odm_write_dig(dm, 0x40);
+
+	/*trigger EDCCA*/
+	phydm_set_edcca_threshold(dm, -30, -23);
+	ODM_delay_ms(1);
+
+	/*search procedure*/
+	th_l2h_dmc = adaptivity->l2h_lb - dm->dc_backoff;
+	if (th_l2h_dmc > 10)
+		th_l2h_dmc = 10;
+
+	phydm_set_edcca_threshold(dm, (th_l2h_dmc - dm->th_edcca_hl_diff), th_l2h_dmc);
+	ODM_delay_ms(30);
+
+	while (is_adjust) {
+		/*check CCA status*/
+		if (phydm_set_bb_dbg_port(dm, BB_DBGPORT_PRIORITY_1, 0x0)) {/*set debug port to 0x0*/
+			reg_value32 = phydm_get_bb_dbg_port_value(dm);
+
+			while (reg_value32 & BIT(3) && try_count < 3) {
+				ODM_delay_ms(3);
+				try_count = try_count + 1;
+				reg_value32 = phydm_get_bb_dbg_port_value(dm);
+			}
+			phydm_release_bb_dbg_port(dm);
+			try_count = 0;
+		}
+
+		/*count EDCCA signal = 1 times*/
+		for (cnt = 0; cnt < 20; cnt++) {
+			if (phydm_set_bb_dbg_port(dm, BB_DBGPORT_PRIORITY_1, adaptivity->adaptivity_dbg_port)) {
+				value32 = phydm_get_bb_dbg_port_value(dm);
+				phydm_release_bb_dbg_port(dm);
+			}
+
+			if (value32 & BIT(30))
+				tx_edcca1 = tx_edcca1 + 1;
+
+			ODM_delay_ms(1);
+		}
+
+		if (tx_edcca1 >= 1) {
+			tx_edcca1 = 0;
+			th_l2h_dmc = th_l2h_dmc + 1;
+			if (th_l2h_dmc > 10)
+				th_l2h_dmc = 10;
+
+			phydm_set_edcca_threshold(dm, (th_l2h_dmc - dm->th_edcca_hl_diff), th_l2h_dmc);
+			if (th_l2h_dmc == 10)
+				is_adjust = false;
+
+		} else {
+			is_adjust = false;
+		}
+
+	}
+
+	adaptivity->l2h_manual = th_l2h_dmc + 13;
+
+	/*revert IGI and EDCCA*/
+	odm_write_dig(dm, igi_bkp);
+	odm_set_bb_reg(dm, 0xc4c, MASKDWORD, reg_c4c_bkp);
+
+	/*revert dynamic mechanism*/
+	dm->disable_phydm_watchdog = 0;
+	dm->edcca_enable = true;
+}
+
+void
 phydm_adaptivity_debug(
 	void		*dm_void,
 	u32		*const dm_value,
@@ -931,6 +1024,8 @@ phydm_adaptivity_debug(
 			PDM_SNPF(out_len, used, output + used,
 				       out_len - used,
 				       "adaptivity is disabled\n");
+	} else if (dm_value[0] == PHYDM_PWDB_LB_MANUAL) {
+		phydm_search_pwdb_lb_manual(dm);
 	}
 	*_used = used;
 	*_out_len = out_len;

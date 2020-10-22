@@ -778,6 +778,8 @@ struct macid_ctl_t {
 
 	/* macid sleep registers */
 	u16 reg_sleep_m0;
+	/* macid drop register */
+	u16 reg_drop_m0;
 #if (MACID_NUM_SW_LIMIT > 32)
 	u16 reg_sleep_m1;
 #endif
@@ -1593,6 +1595,8 @@ struct _ADAPTER {
 	unsigned long wrkq_flags;
 #endif /* CONFIG_RTW_MESH */
 	u8 k; /* 0: driver do calibration, 1: CalControl do calibration */
+	_lock k_lock;
+	u8 k_run;
 	/* 0: stop logging dbg msg, 1: start logging dbg msg */
 	u8 dbg_func_en;
 

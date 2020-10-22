@@ -2373,6 +2373,8 @@ u8 rtw_init_drv_sw(_adapter *padapter)
 	rtw_init_rm(padapter);
 #endif
 	padapter->k = 1;
+	_rtw_spinlock_init(&padapter->k_lock);
+	padapter->k_run = 0;
 exit:
 
 
@@ -2514,6 +2516,8 @@ u8 rtw_free_drv_sw(_adapter *padapter)
 		free_netdev(padapter->rereg_nd_name_priv.old_pnetdev);
 		padapter->rereg_nd_name_priv.old_pnetdev = NULL;
 	}
+
+	_rtw_spinlock_free(&padapter->k_lock);
 
 	return _SUCCESS;
 

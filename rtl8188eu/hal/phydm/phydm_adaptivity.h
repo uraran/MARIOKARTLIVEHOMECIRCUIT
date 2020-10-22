@@ -73,7 +73,8 @@ enum phydm_adaptivity_mode {
 	PHYDM_ADAPT_DEBUG		= 1,
 	PHYDM_ADAPT_RESUME		= 2,
 	PHYDM_EDCCA_TH_PAUSE	= 3,
-	PHYDM_EDCCA_RESUME		= 4
+	PHYDM_EDCCA_RESUME		= 4,
+	PHYDM_PWDB_LB_MANUAL	= 5,
 };
 
 struct phydm_adaptivity_struct {
@@ -104,6 +105,7 @@ struct phydm_adaptivity_struct {
 	s8			rvrt_val[2];
 	s8			th_l2h;
 	s8			th_h2l;
+	s8			l2h_manual;
 };
 
 void

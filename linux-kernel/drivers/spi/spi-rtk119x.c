@@ -57,6 +57,9 @@
 #define SPI_INT			0x30
 	#define CMD_DONE		(1<<0)
 
+#define SPI_INT_IE		0x34
+	#define CMD_DONE_IE		(1<<0)
+
 
 #define RTK_SPI_RXDATA	0
 #define RTK_SPI_TXDATA	4
@@ -202,12 +205,11 @@ static void rtk119x_spi_write(struct rtk119x_spi *hw)
 		}
 
 		writel(0x100, hw->base + SPI_CTRL); // reset r/w fifo
+		writel(CMD_DONE_IE, hw->base + SPI_INT_IE);
 		writel(CMD_ENABLE, hw->base + SPI_CTRL);
 
-		while (!(readl(hw->base + SPI_INT) & CMD_DONE))
-			cpu_relax();
+		wait_for_completion(&hw->done);
 
-		writel(CMD_DONE, hw->base + SPI_INT);// clear
 		offset += RTK_SPI_MAX_WRITE_LEN;
 		write_len = write_len - data_byte_len;
 	}
@@ -238,11 +240,11 @@ static void rtk119x_spi_read(struct rtk119x_spi *hw)
 			writel((ADDR_BIT_LEN(0x0) | READ_CMD), hw->base + SPI_SO_CTRL);
 			writel(0x100, hw->base + SPI_CTRL); // reset r/w fifo
 			writel(RD_BIT_LEN(data_byte_len<<3), hw->base + SPI_SI_CTRL);//Note:read bit len cat't be 0x20
+			writel(CMD_DONE_IE, hw->base + SPI_INT_IE);
 			writel(CMD_ENABLE, hw->base + SPI_CTRL);
 			RTK_SPI_DBG("%s READ CMD, read len(%u)\n", __func__,data_byte_len);
-			while (!(readl(hw->base + SPI_INT) & CMD_DONE))
-				cpu_relax();
-			writel(CMD_DONE, hw->base + SPI_INT);
+
+			wait_for_completion(&hw->done);
 
 			//Read FIFO
 			rxd = readl(hw->base + SPI_R_FIFO);
@@ -268,11 +270,12 @@ static void rtk119x_spi_read(struct rtk119x_spi *hw)
 				writel((ADDR_BIT_LEN(0x0) | READ_CMD), hw->base + SPI_SO_CTRL);
 				writel(0x100, hw->base + SPI_CTRL); // reset r/w fifo
 				writel(RD_BIT_LEN(2<<3), hw->base + SPI_SI_CTRL);//Note:read bit len cat't be 0x20
+				writel(CMD_DONE_IE, hw->base + SPI_INT_IE);
 				writel(CMD_ENABLE, hw->base + SPI_CTRL);
 				RTK_SPI_DBG("%s READ CMD, read len(%u)\n", __func__,2);
-				while (!(readl(hw->base + SPI_INT) & CMD_DONE))
-					cpu_relax();
-				writel(CMD_DONE, hw->base + SPI_INT);
+
+				wait_for_completion(&hw->done);
+
 				rxd = readl(hw->base + SPI_R_FIFO);
 				RTK_SPI_DBG("%s read 0x%08x from FIFO\n", __func__,rxd);
 
@@ -288,11 +291,12 @@ static void rtk119x_spi_read(struct rtk119x_spi *hw)
 				writel((ADDR_BIT_LEN(0x0) | READ_CMD), hw->base + SPI_SO_CTRL);
 				writel(0x100, hw->base + SPI_CTRL); // reset r/w fifo
 				writel(RD_BIT_LEN(2<<3), hw->base + SPI_SI_CTRL);//Note:read bit len cat't be 0x20
+				writel(CMD_DONE_IE, hw->base + SPI_INT_IE);
 				writel(CMD_ENABLE, hw->base + SPI_CTRL);
 				RTK_SPI_DBG("%s READ CMD, read len(%u)\n", __func__,2);
-				while (!(readl(hw->base + SPI_INT) & CMD_DONE))
-					cpu_relax();
-				writel(CMD_DONE, hw->base + SPI_INT);
+
+				wait_for_completion(&hw->done);
+
 				rxd = readl(hw->base + SPI_R_FIFO);
 				RTK_SPI_DBG("%s read 0x%08x from FIFO\n", __func__,rxd);
 
@@ -331,6 +335,20 @@ static int rtk119x_spi_txrx(struct spi_device *spi, struct spi_transfer *t)
 
 }
 
+static irqreturn_t rtk119x_spi_irq(int irq, void *dev)
+{
+	struct rtk119x_spi *hw = dev;
+	unsigned int irq_status;
+
+	irq_status = readl(hw->base + SPI_INT);
+	if (irq_status & CMD_DONE) {
+		writel(0, hw->base + SPI_INT_IE);
+		writel(CMD_DONE, hw->base + SPI_INT);
+		complete(&hw->done);
+	}
+
+	return IRQ_HANDLED;
+}
 
 static int rtk119x_spi_probe(struct platform_device *pdev)
 {
@@ -357,6 +375,7 @@ static int rtk119x_spi_probe(struct platform_device *pdev)
 
 	hw = spi_master_get_devdata(master);
 	platform_set_drvdata(pdev, hw);
+	init_completion(&hw->done);
 
 	/* setup the state for the bitbang driver */
 	hw->bitbang.master = spi_master_get(master);
@@ -368,8 +387,10 @@ static int rtk119x_spi_probe(struct platform_device *pdev)
 
 	/* find and map our resources */
 	hw->base = of_iomap(pdev->dev.of_node, 0);
-	if (!hw->base)
-		goto exit_busy;
+	if (!hw->base) {
+		err = -EBUSY;
+		goto exit;
+	}
 	writel(SPI_CLK_DIV(16) | 2, hw->base + SPI_CONTROL);//Clock 15.xMHz
 	writel(DEFAULT_TIMING,  hw->base + SPI_CS_TIMING);
 	writel(DEFAULT_AUX,     hw->base + SPI_AUX_CTRL);
@@ -393,6 +414,19 @@ static int rtk119x_spi_probe(struct platform_device *pdev)
 	else
 		RTK_SPI_DBG("%s  DTS spi_cs_ctrl not found\n",__func__);
 
+	hw->irq = platform_get_irq(pdev, 0);
+	if (hw->irq < 0) {
+		dev_err(&pdev->dev, "No IRQ specified\n");
+		err = -ENOENT;
+		goto exit_iounmap;
+        }
+        err = request_irq(hw->irq, rtk119x_spi_irq, IRQF_SHARED, pdev->name, hw);
+        if (err) {
+                dev_err(&pdev->dev, "Cannot claim IRQ\n");
+                goto exit_iounmap;
+        }
+	writel(CMD_DONE_IE, hw->base + SPI_INT_IE);
+
 	/* find platform data */
 	if (!platp)
 		hw->bitbang.master->dev.of_node = pdev->dev.of_node;
@@ -404,8 +438,8 @@ static int rtk119x_spi_probe(struct platform_device *pdev)
 	dev_info(&pdev->dev, "base %p, irq %d\n", hw->base, hw->irq);
 	return 0;
 
-exit_busy:
-	err = -EBUSY;
+exit_iounmap:
+	iounmap(hw->base);
 exit:
 	platform_set_drvdata(pdev, NULL);
 	spi_master_put(master);

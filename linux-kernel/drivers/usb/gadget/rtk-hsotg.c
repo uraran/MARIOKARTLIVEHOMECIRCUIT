@@ -742,6 +742,12 @@ static void rtk_hsotg_start_req(struct rtk_hsotg *hsotg,
 		return;
 	}
 
+	if (index == 0 && hsotg->setup == 1) {
+		dev_dbg(hsotg->dev, "set EP0_SETUP for setup req\n");
+		hsotg->ep0_state = EP0_SETUP;
+		hsotg->setup = 0;
+	}
+
 	length = ureq->length - ureq->actual;
 	dev_dbg(hsotg->dev, "ureq->length:%d ureq->actual:%d\n",
 		ureq->length, ureq->actual);
@@ -826,13 +832,8 @@ static void rtk_hsotg_start_req(struct rtk_hsotg *hsotg,
 	dev_dbg(hsotg->dev, "setup req:%d\n", hsotg->setup);
 
 	/* For Setup request do not clear NAK */
-#if 0	//barry
-	if (hsotg->setup && index == 0)
-		hsotg->setup = 0;
-	else
-#endif
+	if (!(index == 0 && hsotg->ep0_state == EP0_SETUP))
 		ctrl |= DxEPCTL_CNAK;	/* clear NAK set by core */
-
 
 	dev_dbg(hsotg->dev, "%s: DxEPCTL=0x%08x\n", __func__, ctrl);
 	writel(ctrl, hsotg->regs + epctrl_reg);
@@ -1386,7 +1387,7 @@ static void rtk_hsotg_enqueue_setup(struct rtk_hsotg *hsotg)
 	}
 
 	hsotg->eps[0].dir_in = 0;
-	hsotg->ep0_state = EP0_SETUP;
+	hsotg->setup = 1;
 
 	ret = rtk_hsotg_ep_queue(&hsotg->eps[0].ep, req, GFP_ATOMIC);
 	if (ret < 0) {
@@ -1448,7 +1449,6 @@ static void rtk_hsotg_complete_request(struct rtk_hsotg *hsotg,
 	if (hs_req->req.complete) {
 		spin_unlock(&hsotg->lock);
 		hs_req->req.complete(&hs_ep->ep, &hs_req->req);
-		udelay(100);
 		spin_lock(&hsotg->lock);
 	}
 
@@ -1530,10 +1530,37 @@ static void rtk_hsotg_rx_data(struct rtk_hsotg *hsotg, int ep_idx, int size)
 	ioread32_rep(fifo, hs_req->req.buf + read_ptr, to_read);
 }
 
+
+static void rtk_hsotg_program_zlp(struct rtk_hsotg *hsotg,
+					struct rtk_hsotg_ep *hs_ep)
+{
+	u32 ctrl;
+	u8 index = hs_ep->index;
+	u32 epctl_reg = hs_ep->dir_in ? DIEPCTL(index) : DOEPCTL(index);
+	u32 epsiz_reg = hs_ep->dir_in ? DIEPTSIZ(index) : DOEPTSIZ(index);
+
+	if (hs_ep->dir_in)
+		dev_dbg(hsotg->dev, "Sending zero-length packet on ep%d\n",
+									index);
+	else
+		dev_dbg(hsotg->dev, "Receiving zero-length packet on ep%d\n",
+									index);
+
+	/* issue a zero-sized packet to terminate this */
+	writel(DxEPTSIZ_MC(1) | DxEPTSIZ_PktCnt(1) |
+		    DxEPTSIZ_XferSize(0), hsotg->regs + epsiz_reg);
+
+	ctrl = readl(hsotg->regs + epctl_reg);
+	ctrl |= DxEPCTL_CNAK;  /* clear NAK set by core */
+	ctrl |= DxEPCTL_EPEna; /* ensure ep enabled */
+	ctrl |= DxEPCTL_USBActEp;
+	writel(ctrl, hsotg->regs + epctl_reg);
+}
+
 /**
- * rtk_hsotg_send_zlp - send zero-length packet on control endpoint
+ * rtk_hsotg_ep0_zlp - send/receive zero-length packet on control endpoint
  * @hsotg: The device instance
- * @req: The request currently on this endpoint
+ * @dir_in: If IN zlp
  *
  * Generate a zero-length IN packet request for terminating a SETUP
  * transaction.
@@ -1542,36 +1569,13 @@ static void rtk_hsotg_rx_data(struct rtk_hsotg *hsotg, int ep_idx, int size)
  * currently believed that we do not need to wait for any space in
  * the TxFIFO.
  */
-static void rtk_hsotg_send_zlp(struct rtk_hsotg *hsotg,
-			       struct rtk_hsotg_req *req)
+static void rtk_hsotg_ep0_zlp(struct rtk_hsotg *hsotg, bool dir_in)
 {
-	u32 ctrl;
+	/* eps[0] is used in both directions */
+	hsotg->eps[0].dir_in = dir_in;
+	hsotg->ep0_state = dir_in ? EP0_STATUS_IN : EP0_STATUS_OUT;
 
-	if (!req) {
-		dev_warn(hsotg->dev, "%s: no request?\n", __func__);
-		return;
-	}
-
-	if (req->req.length == 0) {
-		hsotg->eps[0].sent_zlp = 1;
-		rtk_hsotg_enqueue_setup(hsotg);
-		return;
-	}
-
-	hsotg->eps[0].dir_in = 1;
-	hsotg->eps[0].sent_zlp = 1;
-
-	dev_dbg(hsotg->dev, "sending zero-length packet\n");
-
-	/* issue a zero-sized packet to terminate this */
-	writel(DxEPTSIZ_MC(1) | DxEPTSIZ_PktCnt(1) |
-	       DxEPTSIZ_XferSize(0), hsotg->regs + DIEPTSIZ(0));
-
-	ctrl = readl(hsotg->regs + DIEPCTL0);
-	ctrl |= DxEPCTL_CNAK;  /* clear NAK set by core */
-	ctrl |= DxEPCTL_EPEna; /* ensure ep enabled */
-	ctrl |= DxEPCTL_USBActEp;
-	writel(ctrl, hsotg->regs + DIEPCTL0);
+	rtk_hsotg_program_zlp(hsotg, &hsotg->eps[0]);
 }
 
 /**
@@ -1585,7 +1589,7 @@ static void rtk_hsotg_send_zlp(struct rtk_hsotg *hsotg,
  * packet or by the finish of a transfer.
  */
 static void rtk_hsotg_handle_outdone(struct rtk_hsotg *hsotg,
-				     int epnum, bool was_setup)
+				     int epnum)
 {
 	u32 epsize = readl(hsotg->regs + DOEPTSIZ(epnum));
 	struct rtk_hsotg_ep *hs_ep = &hsotg->eps[epnum];
@@ -1596,6 +1600,13 @@ static void rtk_hsotg_handle_outdone(struct rtk_hsotg *hsotg,
 
 	if (!hs_req) {
 		dev_dbg(hsotg->dev, "%s: no request active\n", __func__);
+		return;
+	}
+
+	if (epnum == 0 && hsotg->ep0_state == EP0_STATUS_OUT) {
+		dev_dbg(hsotg->dev, "EP0_STATUS_OUT zlp packet received\n");
+		rtk_hsotg_complete_request(hsotg, hs_ep, hs_req, 0);
+		rtk_hsotg_enqueue_setup(hsotg);
 		return;
 	}
 
@@ -1621,12 +1632,6 @@ static void rtk_hsotg_handle_outdone(struct rtk_hsotg *hsotg,
 	if (req->actual < req->length && size_left == 0) {
 		rtk_hsotg_start_req(hsotg, hs_ep, hs_req, true);
 		return;
-	} else if (epnum == 0) {
-		/*
-		 * After was_setup = 1 =>
-		 * set CNAK for non Setup requests
-		 */
-		hsotg->setup = was_setup ? 0 : 1;
 	}
 
 	if (req->actual < req->length && req->short_not_ok) {
@@ -1644,8 +1649,10 @@ static void rtk_hsotg_handle_outdone(struct rtk_hsotg *hsotg,
 		 * Condition req->complete != rtk_hsotg_complete_setup says:
 		 * send ZLP when we have an asynchronous request from gadget
 		 */
-		if (!was_setup && req->complete != rtk_hsotg_complete_setup)
-			rtk_hsotg_send_zlp(hsotg, hs_req);
+		if (hsotg->ep0_state == EP0_DATA_OUT) {
+			rtk_hsotg_ep0_zlp(hsotg, true);
+			return;
+		}
 	}
 
 	rtk_hsotg_complete_request(hsotg, hs_ep, hs_req, result);
@@ -1712,8 +1719,9 @@ static void rtk_hsotg_handle_rx(struct rtk_hsotg *hsotg)
 		dev_dbg(hsotg->dev, "OutDone (Frame=0x%08x)\n",
 			rtk_hsotg_read_frameno(hsotg));
 
-		if (!using_dma(hsotg))
-			rtk_hsotg_handle_outdone(hsotg, epnum, false);
+		if (!using_dma(hsotg) &&
+			    !(epnum == 0 && hsotg->ep0_state == EP0_SETUP))
+			rtk_hsotg_handle_outdone(hsotg, epnum);
 		break;
 
 	case __status(GRXSTS_PktSts_SetupDone):
@@ -1722,7 +1730,7 @@ static void rtk_hsotg_handle_rx(struct rtk_hsotg *hsotg)
 			rtk_hsotg_read_frameno(hsotg),
 			readl(hsotg->regs + DOEPCTL(0)));
 		if (hsotg->ep0_state == EP0_SETUP)
-			rtk_hsotg_handle_outdone(hsotg, epnum, true);
+			rtk_hsotg_handle_outdone(hsotg, epnum);
 		else
 			dev_dbg(hsotg->dev, "Don't do outdone on SetupDone "
 				    "due to ep0_state not EP0_SETUP\n");
@@ -1730,6 +1738,10 @@ static void rtk_hsotg_handle_rx(struct rtk_hsotg *hsotg)
 		break;
 
 	case __status(GRXSTS_PktSts_OutRX):
+		dev_dbg(hsotg->dev,
+			"OutRX (Frame=0x%08x, DOPEPCTL=0x%08x)\n",
+			rtk_hsotg_read_frameno(hsotg),
+			readl(hsotg->regs + DOEPCTL(0)));
 		rtk_hsotg_rx_data(hsotg, epnum, size);
 		break;
 
@@ -1918,9 +1930,11 @@ static void rtk_hsotg_complete_in(struct rtk_hsotg *hsotg,
 	}
 
 	/* Finish ZLP handling for IN EP0 transactions */
-	if (hsotg->eps[0].sent_zlp) {
-		dev_dbg(hsotg->dev, "zlp packet received\n");
+	if (hs_ep->index == 0 && hsotg->ep0_state == EP0_STATUS_IN) {
+		dev_dbg(hsotg->dev, "EP0_STATUS_IN zlp packet received\n");
 		rtk_hsotg_complete_request(hsotg, hs_ep, hs_req, 0);
+
+		rtk_hsotg_enqueue_setup(hsotg);
 		return;
 	}
 
@@ -1947,6 +1961,13 @@ static void rtk_hsotg_complete_in(struct rtk_hsotg *hsotg,
 	dev_dbg(hsotg->dev, "req->length:%d req->actual:%d req->zero:%d\n",
 		hs_req->req.length, hs_req->req.actual, hs_req->req.zero);
 
+	if (!size_left && hs_req->req.actual < hs_req->req.length) {
+
+		dev_dbg(hsotg->dev, "%s trying more for req...\n", __func__);
+		rtk_hsotg_start_req(hsotg, hs_ep, hs_req, true);
+		return;
+	}
+
 	/*
 	 * Check if dealing with Maximum Packet Size(MPS) IN transfer at EP0
 	 * When sent data is a multiple MPS size (e.g. 64B ,128B ,192B
@@ -1957,21 +1978,12 @@ static void rtk_hsotg_complete_in(struct rtk_hsotg *hsotg,
 	 * Check req.length to NOT send another ZLP when the current one is
 	 * under completion (the one for which this completion has been called).
 	 */
-	if (hs_req->req.length && hs_ep->index == 0 && hs_req->req.zero &&
-	    hs_req->req.length == hs_req->req.actual &&
-	    !(hs_req->req.length % hs_ep->ep.maxpacket)) {
-
-		dev_dbg(hsotg->dev, "ep0 zlp IN packet sent\n");
-		rtk_hsotg_send_zlp(hsotg, hs_req);
-
+	if (hs_ep->index == 0 && hsotg->ep0_state == EP0_DATA_IN) {
+		rtk_hsotg_ep0_zlp(hsotg, false);
 		return;
 	}
 
-	if (!size_left && hs_req->req.actual < hs_req->req.length) {
-		dev_dbg(hsotg->dev, "%s trying more for req...\n", __func__);
-		rtk_hsotg_start_req(hsotg, hs_ep, hs_req, true);
-	} else
-		rtk_hsotg_complete_request(hsotg, hs_ep, hs_req, 0);
+	rtk_hsotg_complete_request(hsotg, hs_ep, hs_req, 0);
 }
 
 /**
@@ -2000,6 +2012,13 @@ static void rtk_hsotg_epint(struct rtk_hsotg *hsotg, unsigned int idx,
 
 	dev_dbg(hsotg->dev, "%s: ep%d(%s) DxEPINT=0x%08x\n",
 		__func__, idx, dir_in ? "in" : "out", ints);
+
+	/* Don't process XferCompl interrupt if it is a setup packet */
+	if (idx == 0 && (ints & (DxEPINT_Setup | DxEPINT_StupPktRcvd)))
+		ints &= ~DxEPINT_XferCompl;
+
+	if (ints & DxEPINT_StsPhseRcvd)
+		dev_dbg(hsotg->dev, "%s: StsPhseRcvd asserted\n", __func__);
 
 	if (ints & DxEPINT_XferCompl) {
 		if (hs_ep->isochronous && hs_ep->interval == 1) {
@@ -2030,7 +2049,7 @@ static void rtk_hsotg_epint(struct rtk_hsotg *hsotg, unsigned int idx,
 			 * as we ignore the RXFIFO.
 			 */
 
-			rtk_hsotg_handle_outdone(hsotg, idx, false);
+			rtk_hsotg_handle_outdone(hsotg, idx);
 		}
 	}
 
@@ -2069,7 +2088,7 @@ static void rtk_hsotg_epint(struct rtk_hsotg *hsotg, unsigned int idx,
 			if (dir_in)
 				WARN_ON_ONCE(1);
 			else
-				rtk_hsotg_handle_outdone(hsotg, 0, true);
+				rtk_hsotg_handle_outdone(hsotg, 0);
 		}
 	}
 
@@ -2383,10 +2402,9 @@ static void rtk_hsotg_core_init(struct rtk_hsotg *hsotg)
 	 * don't need XferCompl, we get that from RXFIFO in slave mode. In
 	 * DMA mode we may need this.
 	 */
-	writel((using_dma(hsotg) ? (DIEPMSK_XferComplMsk |
-				    DIEPMSK_TimeOUTMsk) : 0) |
+	writel((using_dma(hsotg) ? DOEPMSK_XferComplMsk : 0) |
 	       DOEPMSK_EPDisbldMsk | DOEPMSK_AHBErrMsk |
-	       DOEPMSK_SetupMsk,
+	       DOEPMSK_SetupMsk | DOEPMSK_StsPhseRcvdMsk,
 	       hsotg->regs + DOEPMSK);
 
 	writel(0, hsotg->regs + DAINTMSK);
@@ -3367,6 +3385,10 @@ static int state_show(struct seq_file *seq, void *v)
 		 readl(regs + DCFG),
 		 readl(regs + DCTL),
 		 readl(regs + DSTS));
+
+	seq_printf(seq, "GAHBCFG=0x%08x, 0x44=0x%08x\n",
+		 readl(regs + GAHBCFG), readl(regs + 0x44));
+
 
 	seq_printf(seq, "DIEPMSK=0x%08x, DOEPMASK=0x%08x\n",
 		   readl(regs + DIEPMSK), readl(regs + DOEPMSK));

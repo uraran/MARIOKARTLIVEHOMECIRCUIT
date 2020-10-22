@@ -1145,6 +1145,63 @@ inline s32 rtw_hal_macid_wakeup_all_used(_adapter *adapter)
 	return _rtw_hal_macid_bmp_sleep(adapter, &macid_ctl->used, 0);
 }
 
+static s32 _rtw_hal_macid_drop(_adapter *adapter, u8 macid, u8 drop)
+{
+	struct macid_ctl_t *macid_ctl = adapter_to_macidctl(adapter);
+	u16 reg_drop = 0;
+	u8 bit_shift;
+	u32 val32;
+	s32 ret = _FAIL;
+
+	if (macid >= macid_ctl->num) {
+		RTW_ERR(ADPT_FMT" %s invalid macid(%u)\n"
+			, ADPT_ARG(adapter), drop ? "drop" : "undrop" , macid);
+		goto exit;
+	}
+	
+	if (macid < 32) {
+		reg_drop = macid_ctl->reg_drop_m0;
+		bit_shift = macid;
+	} else {
+		rtw_warn_on(1);
+		goto exit;
+	}
+
+	if (!reg_drop) {
+		rtw_warn_on(1);
+		goto exit;
+	}
+	val32 = rtw_read32(adapter, reg_drop);
+	/*RTW_INFO(ADPT_FMT" %s macid=%d, ori reg_0x%03x=0x%08x \n"
+		, ADPT_ARG(adapter), drop ? "drop" : "undrop"
+		, macid, reg_drop, val32);*/
+
+	ret = _SUCCESS;
+
+	if (drop) {
+		if (val32 & BIT(bit_shift))
+			goto exit;
+		val32 |= BIT(bit_shift);
+	} else {
+		if (!(val32 & BIT(bit_shift)))
+			goto exit;
+		val32 &= ~BIT(bit_shift);
+	}
+
+	rtw_write32(adapter, reg_drop, val32);
+	RTW_INFO(ADPT_FMT" %s macid=%d, done reg_0x%03x=0x%08x\n"
+		, ADPT_ARG(adapter), drop ? "drop" : "undrop"
+		, macid, reg_drop, val32);
+
+exit:
+	return ret;
+}
+
+inline s32 rtw_hal_macid_drop(_adapter *adapter, u8 macid)
+{
+	return _rtw_hal_macid_drop(adapter, macid, 1);
+}
+
 s32 rtw_hal_fill_h2c_cmd(PADAPTER padapter, u8 ElementID, u32 CmdLen, u8 *pCmdBuffer)
 {
 	_adapter *pri_adapter = GET_PRIMARY_ADAPTER(padapter);

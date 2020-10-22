@@ -2043,6 +2043,7 @@ u32 rtw_hal_mp_get_psd_dc_tone(PADAPTER padapter)
 	HAL_DATA_TYPE	*pHalData = GET_HAL_DATA(padapter);
 	struct dm_struct		*pDM_Odm = &pHalData->odmpriv;
 	u32 dc_val = 0;
+
 	dc_val = halrf_get_psd_dc_tone_8188e(pDM_Odm);
 
 	RTW_INFO("%s(), dc  val = %d \n", __func__, dc_val);

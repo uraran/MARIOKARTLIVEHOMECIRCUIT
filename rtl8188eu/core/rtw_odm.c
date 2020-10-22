@@ -49,6 +49,9 @@ u32 rtw_phydm_ability_ops(_adapter *adapter, HAL_PHYDM_OPS ops, u32 ability)
 	case HAL_PHYDM_ABILITY_GET:
 		result = podmpriv->support_ability;
 		break;
+	case HAL_PHYDM_DIS_HALRF:
+		halrf_cmn_info_set(podmpriv, HALRF_CMNINFO_ABILITY, DYNAMIC_FUNC_DISABLE);
+		break;
 	}
 	return result;
 }

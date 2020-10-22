@@ -147,8 +147,8 @@ void do_lck_8188e(
 )
 {
 	struct dm_struct	*dm = (struct dm_struct *)dm_void;
-
-	dm->rf_calibrate_info.thermal_value_lck = thermal_value;
+	if (thermal_value != 0)
+		dm->rf_calibrate_info.thermal_value_lck = thermal_value;
 	halrf_lck_trigger(dm);
 }
 
@@ -162,7 +162,8 @@ void do_iqk_8188e(
 	struct dm_struct	*dm = (struct dm_struct *)dm_void;
 
 	odm_reset_iqk_result(dm);
-	dm->rf_calibrate_info.thermal_value_iqk = thermal_value;
+	if (thermal_value != 0)
+		dm->rf_calibrate_info.thermal_value_iqk = thermal_value;
 	halrf_iqk_trigger(dm, false);
 }
 

@@ -2549,6 +2549,7 @@ void init_hal_spec_8188e(_adapter *adapter)
 	rtw_macid_ctl_init_sleep_reg(adapter_to_macidctl(adapter)
 		, REG_MACID_PAUSE_0
 		, REG_MACID_PAUSE_1, 0, 0);
+	adapter_to_macidctl(adapter)->reg_drop_m0 = REG_MACID_NO_LINK_0;
 }
 
 #ifdef CONFIG_RFKILL_POLL
